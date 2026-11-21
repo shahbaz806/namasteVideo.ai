@@ -1,5 +1,6 @@
-import { getDb } from '../../client';
-import { COLLECTIONS, StoryboardDocument, StoryboardFrame, ProjectDocument } from '../../schema';
+import { getDb } from '../client';
+import { COLLECTIONS, ProjectDocument } from '../schema';
+import { StoryboardDocument, StoryboardFrame } from '../schemas/storyboard';
 import { ObjectId } from 'mongodb';
 
 /** Fetch a storyboard for a given project */

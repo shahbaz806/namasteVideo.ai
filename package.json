@@ -26,6 +26,9 @@
     "@fontsource/dm-sans": "5.2.6"
   },
   "devDependencies": {
+    "mongoose": "^8.5.0",
+
+    "mongodb-memory-server": "^8.14.0",
     "@types/node": "22.19.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
