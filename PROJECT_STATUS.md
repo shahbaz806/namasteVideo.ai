@@ -6,7 +6,7 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F06 — My Videos library UI: Done.** Real project data from API, filter bar (All/Drafts/Ready/Scheduled/Published/Needs Attention), load-more cursor pagination, skeleton loading/error/empty states, rename and delete confirmation dialogs verified. Next feature: F07, Idea draft API, autosave and conflict handling.
+**F07 — Idea draft API, autosave and conflict handling: Done.** Authenticated Draft endpoints (`/api/projects/[id]/draft` GET and PATCH), ownership isolation, CAS optimistic concurrency conflict handling (`REVISION_CONFLICT` with `details.currentRevision` and `details.reloadUrl`), autosave with empty string preservation, voice preset validation (`VOICE_UNAVAILABLE`), and automatic plan staleness detection verified. Next feature: F08, Idea and brainstorming UI/integration.
 
 No hosted rendering, Instagram integration, or storyboard generation UI exists yet. The local video pipeline predates the application and remains separately usable.
 
@@ -32,7 +32,7 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F04 | Sign-in/recovery UI and private route protection | Done | Approved sign-in flow; generic errors; expired session; private pages inaccessible anonymously — evidence below |
 | F05 | Personal project create/list/rename/delete APIs | Done | Ownership isolation, validation, pagination and deletion behavior tested — evidence below |
 | F06 | My videos library UI | Done | Real project data, filters, load more, empty/loading/error states and rename/delete dialogs — evidence below |
-| F07 | Idea draft API, autosave and conflict handling | Planned | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks |
+| F07 | Idea draft API, autosave and conflict handling | Done | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks — evidence below |
 | F08 | Idea and brainstorming UI/integration | Planned | Save real idea; Gemini topic suggestions; use suggestion; available voice preview |
 | F09 | Storyboard generation backend | Planned | Validated scene contract, saved version, bounded repair and recoverable failure |
 | F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
@@ -243,6 +243,39 @@ Verified November 21, 2026:
 - Job progress polling and real-time stage updates deferred to F13.
 - Storyboard generator UI integration deferred to F09–F11.
 
+## F07 — implementation record
+
+Scope: authenticated draft GET and PATCH endpoints with ownership isolation, CAS revision-conflict detection, autosave support, voice preset validation, and plan staleness marking.
+
+- `apps/web/lib/db/repositories/drafts.ts`: draft repository functions and helpers:
+  - `DraftView` and `FieldIssue` contracts matching API_DESIGN.md.
+  - `computeDraftHash`: deterministic canonical JSON (`canonicalizationVersion: 1`) SHA-256 hash across audience, editablePlan, notes, topic, and voicePreset.
+  - `validateDraftFields`: checks topic (required, max 2000), audience (max 200), notes (max 20000), and plan staleness.
+  - `getDraft`: verifies parent project ownership and non-deleted state, returns `DraftView`.
+  - `updateDraft`: CAS compare-and-swap update checking `expectedRevision`, validates `voicePreset` (`VOICE_UNAVAILABLE`), verifies `editablePlan.voicePreset` consistency, automatically flags `planStale: true` when topic/notes/voice change while an editablePlan exists, atomically increments revision, updates parent project's `draftRevision` and `updatedAt`, and returns 409 `REVISION_CONFLICT` with `details.currentRevision` and `details.reloadUrl` on stale revisions.
+- `apps/web/app/api/projects/[id]/draft/route.ts`:
+  - `GET`: returns 200 `DraftView` or 404 `NOT_FOUND`.
+  - `PATCH`: parses JSON body (bounded at 256 KiB), validates `expectedRevision` and `changes` object, validates length bounds, executes repository CAS update, returns 200, 404, 409, or 422.
+- `tests/drafts.test.ts`: 9 automated tests covering initial blank draft read, 404 for deleted/nonexistent projects, cross-user isolation, multi-field update with revision increment, autosave with empty strings, CAS revision conflict detection with details, field limit validation, voice preset availability validation, and plan staleness detection.
+
+### Verification
+
+Verified November 21, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| Root typecheck | `npm.cmd run typecheck` | Passed (exit 0) |
+| Web typecheck | `npm.cmd run typecheck:web` | Passed (exit 0, route types generated) |
+| Types and regression tests | `npm.cmd test` | All 56 tests passed (9 new draft API tests) |
+| Web production build | `npm.cmd run build` | Passed; `/api/projects/[id]/draft` dynamically compiled |
+
+### Remaining limitations
+
+- Idea and brainstorming UI/integration deferred to F08.
+- Storyboard generator backend and scene contract validation deferred to F09.
+- Storyboard review UI and inline editing deferred to F10.
+
 
 
 
@@ -261,3 +294,4 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 | 2026-11-21 | F04 | Implemented Cinema-styled sign-in UI, operator recovery disclosure, route protection middleware, and dashboard boundary | Production build passed, both typechecks passed, all 32 tests passed including middleware route protection checks |
 | 2026-11-21 | F05 | Implemented authenticated project CRUD APIs, ownership isolation, idempotent create/delete, cursor pagination, CAS updates, cleanup jobs, and 7 endpoint tests | Production build passed, both typechecks passed, all 39 tests passed, 52 indexes verified |
 | 2026-11-21 | F06 | Implemented My Videos library UI with real API data, filter bar, load-more pagination, skeleton/error/empty states, rename and delete dialogs, and 8 integration tests | Production build passed, both typechecks passed, all 47 tests passed |
+| 2026-11-21 | F07 | Implemented authenticated idea draft GET/PATCH APIs, CAS conflict protection, autosave preservation, voice availability validation, plan staleness tracking, and 9 endpoint tests | Production build passed, both typechecks passed, all 56 tests passed |
