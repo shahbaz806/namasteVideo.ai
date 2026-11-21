@@ -6,9 +6,9 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F05 — Personal project create/list/rename/delete APIs: Done.** Authenticated CRUD endpoints (`/api/projects`, `/api/projects/[id]`), ownership isolation, idempotent create/delete, cursor pagination, CAS revision-guarded updates, and cleanup job creation verified. Next feature: F06, My Videos library UI.
+**F06 — My Videos library UI: Done.** Real project data from API, filter bar (All/Drafts/Ready/Scheduled/Published/Needs Attention), load-more cursor pagination, skeleton loading/error/empty states, rename and delete confirmation dialogs verified. Next feature: F07, Idea draft API, autosave and conflict handling.
 
-No hosted rendering, Instagram integration, or public-facing UI for projects exists yet. The local video pipeline predates the application and remains separately usable.
+No hosted rendering, Instagram integration, or storyboard generation UI exists yet. The local video pipeline predates the application and remains separately usable.
 
 ## How this document is maintained
 
@@ -31,7 +31,7 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F03 | Internal account admission and session backend | Done | Better Auth, provision approved users, no public signup, login/logout and disabled-user tests — evidence below |
 | F04 | Sign-in/recovery UI and private route protection | Done | Approved sign-in flow; generic errors; expired session; private pages inaccessible anonymously — evidence below |
 | F05 | Personal project create/list/rename/delete APIs | Done | Ownership isolation, validation, pagination and deletion behavior tested — evidence below |
-| F06 | My videos library UI | Planned | Real project data, filters, load more, empty/loading/error states and rename/delete dialogs |
+| F06 | My videos library UI | Done | Real project data, filters, load more, empty/loading/error states and rename/delete dialogs — evidence below |
 | F07 | Idea draft API, autosave and conflict handling | Planned | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks |
 | F08 | Idea and brainstorming UI/integration | Planned | Save real idea; Gemini topic suggestions; use suggestion; available voice preview |
 | F09 | Storyboard generation backend | Planned | Validated scene contract, saved version, bounded repair and recoverable failure |
@@ -207,6 +207,42 @@ Verified November 21, 2026:
 - Idea draft persistence and autosave deferred to F07.
 - Storyboard generator UI integration deferred to F09–F11.
 
+## F06 — implementation record
+
+Scope: client-side project library dashboard with real API data, filters, load-more pagination, skeleton/error/empty states, rename dialog, and delete confirmation dialog.
+
+- `apps/web/components/projects/types.ts`: client-side type definitions for `ProjectView`, `ProjectFilter`, `PageInfo`, API response shapes and error types matching API_DESIGN.md contracts.
+- `apps/web/components/projects/api.ts`: browser `fetch`-based API client helpers for `fetchProjects` (with filter/cursor/limit), `createProject` (with Idempotency-Key), `renameProject` (PATCH with CAS), and `deleteProject` (with Idempotency-Key and confirmation).
+- `apps/web/components/projects/ProjectLibrary.tsx`: `'use client'` component containing:
+  - `FilterBar` — tab-style filter row (All/Drafts/Ready/Scheduled/Published/Needs Attention) with ARIA `tablist`/`tab` roles.
+  - `ProjectCard` — project card with title, computed stage badge (Draft/Processing/Ready/Scheduled/Published/Needs Attention), relative time, Rename and Delete action buttons.
+  - `RenameDialog` — modal dialog with auto-selected input, character counter, Cancel/Save buttons, disabled when unchanged.
+  - `DeleteDialog` — destructive confirmation modal with project name and permanent deletion warning.
+  - `SkeletonCards` — shimmer loading placeholders matching card layout.
+  - `ProjectLibrary` — main container managing loading/loaded/error state machine, project list, pagination cursor, filter switching, create/rename/delete flows, and inline error banners.
+- `apps/web/components/projects/index.ts`: barrel export for `ProjectLibrary` and types.
+- `apps/web/app/dashboard/page.tsx`: updated to import and render `ProjectLibrary` client component inside the Cinema-styled dashboard shell with active "+ New video" button.
+- `tests/library-ui.test.ts`: 8 integration tests covering dashboard page rendering, filter=all listing, filter=drafts validation, filter=published empty state, rename flow via PATCH, delete flow with list verification, load-more pagination with no duplicates, and empty state for new users.
+
+### Verification
+
+Verified November 21, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| Root typecheck | `npm.cmd run typecheck` | Passed (exit 0) |
+| Web typecheck | `npm.cmd run typecheck:web` | Passed (exit 0, route types generated) |
+| Types and regression tests | `npm.cmd test` | All 47 tests passed (8 new library UI tests) |
+| Web production build | `npm.cmd run build` | Passed; `/dashboard` compiled at 2.95 kB with client ProjectLibrary component |
+
+### Remaining limitations
+
+- Idea draft persistence and autosave deferred to F07.
+- Project cards link to idea/storyboard/video stages deferred to F08–F11.
+- Job progress polling and real-time stage updates deferred to F13.
+- Storyboard generator UI integration deferred to F09–F11.
+
 
 
 
@@ -224,3 +260,4 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 | 2026-11-19 | F03 | Implemented Better Auth backend, internal admission allowlist, session facade endpoints, provisioning script and tests | Production build passed, both typechecks passed, all 28 tests passed including admission and disabled-user checks |
 | 2026-11-21 | F04 | Implemented Cinema-styled sign-in UI, operator recovery disclosure, route protection middleware, and dashboard boundary | Production build passed, both typechecks passed, all 32 tests passed including middleware route protection checks |
 | 2026-11-21 | F05 | Implemented authenticated project CRUD APIs, ownership isolation, idempotent create/delete, cursor pagination, CAS updates, cleanup jobs, and 7 endpoint tests | Production build passed, both typechecks passed, all 39 tests passed, 52 indexes verified |
+| 2026-11-21 | F06 | Implemented My Videos library UI with real API data, filter bar, load-more pagination, skeleton/error/empty states, rename and delete dialogs, and 8 integration tests | Production build passed, both typechecks passed, all 47 tests passed |

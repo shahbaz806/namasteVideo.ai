@@ -1,4 +1,6 @@
+import React from 'react';
 import Link from 'next/link';
+import { ProjectLibrary } from '../../components/projects';
 
 export const metadata = {
   title: 'Dashboard · NamasteVideo.ai',
@@ -29,24 +31,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="panel" style={{ border: '1px solid var(--border)', borderRadius: 'var(--panel-radius)', padding: '32px', marginBottom: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', marginBottom: '4px' }}>My Videos</h2>
-            <p className="hint" style={{ margin: 0 }}>Your isolated projects and storyboard versions.</p>
-          </div>
-          <button className="button button--primary" disabled title="Project creation enabled in Feature F05">
-            + New video
-          </button>
-        </div>
-
-        <div style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', background: 'var(--canvas)' }}>
-          <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '16px' }}>
-            No videos in your workspace yet.
-          </p>
-          <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-            Project creation and library storage will be activated in Feature F05 & F06.
-          </span>
-        </div>
+        <ProjectLibrary />
       </div>
 
       <div style={{ display: 'flex', gap: '16px' }}>
