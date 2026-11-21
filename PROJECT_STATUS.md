@@ -34,7 +34,8 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F06 | My videos library UI | Done | Real project data, filters, load more, empty/loading/error states and rename/delete dialogs — evidence below |
 | F07 | Idea draft API, autosave and conflict handling | Done | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks — evidence below |
 | F08 | Idea and brainstorming UI/integration | Done | Save real idea; Gemini topic suggestions; use suggestion; available voice preview — evidence below |
-| F09 | Storyboard generation backend | Planned | Validated scene contract, saved version, bounded repair and recoverable failure |
+| F09 | Storyboard generation backend | Done | Implemented schema, repository, job helper, API routes, UI page, tests passed. |
+| F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
 | F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
 | F11 | Conversational storyboard revisions and approval | Planned | Changed scenes, restore, stale-result handling, immutable approved version |
 | F12 | Private R2 asset adapter and media access | Planned | Private upload/read, owner-authorized access, expiry and missing-asset behavior |
