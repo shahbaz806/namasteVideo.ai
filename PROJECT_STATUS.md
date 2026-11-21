@@ -6,9 +6,9 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F07 — Idea draft API, autosave and conflict handling: Done.** Authenticated Draft endpoints (`/api/projects/[id]/draft` GET and PATCH), ownership isolation, CAS optimistic concurrency conflict handling (`REVISION_CONFLICT` with `details.currentRevision` and `details.reloadUrl`), autosave with empty string preservation, voice preset validation (`VOICE_UNAVAILABLE`), and automatic plan staleness detection verified. Next feature: F08, Idea and brainstorming UI/integration.
+**F08 — Idea and brainstorming UI/integration: Done.** Topic, audience, and source notes editor (`/projects/[id]/idea`), four-step project layout (`/projects/[id]/layout.tsx`), 1-second debounced autosave with CAS conflict preservation, auditioned voice selector (`/api/voices`), Gemini/pedagogical brainstorming modal (`/api/projects/[id]/brainstorm`), suggestion application flow, and job inspection (`/api/jobs/[id]`) verified. Next feature: F09, Storyboard generation backend.
 
-No hosted rendering, Instagram integration, or storyboard generation UI exists yet. The local video pipeline predates the application and remains separately usable.
+No hosted rendering, Instagram integration, or video synthesis UI exists yet. The local video pipeline predates the application and remains separately usable.
 
 ## How this document is maintained
 
@@ -33,7 +33,7 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F05 | Personal project create/list/rename/delete APIs | Done | Ownership isolation, validation, pagination and deletion behavior tested — evidence below |
 | F06 | My videos library UI | Done | Real project data, filters, load more, empty/loading/error states and rename/delete dialogs — evidence below |
 | F07 | Idea draft API, autosave and conflict handling | Done | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks — evidence below |
-| F08 | Idea and brainstorming UI/integration | Planned | Save real idea; Gemini topic suggestions; use suggestion; available voice preview |
+| F08 | Idea and brainstorming UI/integration | Done | Save real idea; Gemini topic suggestions; use suggestion; available voice preview — evidence below |
 | F09 | Storyboard generation backend | Planned | Validated scene contract, saved version, bounded repair and recoverable failure |
 | F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
 | F11 | Conversational storyboard revisions and approval | Planned | Changed scenes, restore, stale-result handling, immutable approved version |
@@ -276,6 +276,46 @@ Verified November 21, 2026:
 - Storyboard generator backend and scene contract validation deferred to F09.
 - Storyboard review UI and inline editing deferred to F10.
 
+## F08 — implementation record
+
+Scope: Idea & Concept editor UI (`/projects/[id]/idea`), four-stage project layout (`/projects/[id]/layout.tsx`), autosave debouncing with conflict preservation, auditioned voice presets (`/api/voices`), Gemini topic brainstorming (`/api/projects/[id]/brainstorm`), and job tracking (`/api/jobs/[id]`).
+
+- `apps/web/lib/db/repositories/jobs.ts`: jobs repository with `createBrainstormJob`, `getJob`, `toJobView`, Gemini prompt generator, and fallback educational suggestions.
+- `apps/web/app/api/voices/route.ts`: returns auditioned voices (`daniel-test`, `indian-english-male`, `indian-english-female`) and default preset (`daniel-test`).
+- `apps/web/app/api/jobs/[id]/route.ts`: owner-scoped job retrieval returning `JobView` matching API_DESIGN.md.
+- `apps/web/app/api/projects/[id]/brainstorm/route.ts`: authenticated, idempotent POST route triggering 3–4 video concept suggestions and returning 202 `AcceptedOperation` with `jobId`.
+- `apps/web/components/editor/StepIndicator.tsx`: reusable four-stage progress nav (Idea → Storyboard → Video → Publish) with status badges and step linking.
+- `apps/web/components/editor/VoiceSelector.tsx`: interactive voice selection cards with test badges, accents, and studio synthesis specs.
+- `apps/web/components/editor/BrainstormModal.tsx`: modal dialog for generating tailored pedagogical angles and applying them with one click.
+- `apps/web/components/editor/IdeaEditor.tsx`: client component with:
+  - Topic, Target Audience, and Source Notes inputs with character counters.
+  - 1-second debounced autosave calling `PATCH /api/projects/[id]/draft`.
+  - Save status indicators (Saved, Saving…, Unsaved, Conflict, Error).
+  - Stale revision conflict banner that preserves user input without silent overwrites.
+  - "✦ Brainstorm Ideas" trigger and "Proceed to Storyboard →" link.
+- `apps/web/app/projects/[id]/layout.tsx`: shared project layout with Cinema tokens, back link to My Videos, project identifier, and step indicator.
+- `apps/web/app/projects/[id]/idea/page.tsx`: server component loading draft and voices, rendering `IdeaEditor`.
+- `apps/web/components/projects/ProjectLibrary.tsx`: updated project cards with direct "Open" links to `/projects/[id]/idea`.
+- `tests/idea-ui.test.ts`: 6 integration tests covering `/api/voices`, brainstorm creation and replay, job inspection with suggestion schemas, brainstorm ownership isolation, suggestion persistence, and layout/page rendering.
+
+### Verification
+
+Verified November 21, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| Root typecheck | `npm.cmd run typecheck` | Passed (exit 0) |
+| Web typecheck | `npm.cmd run typecheck:web` | Passed (exit 0, route types generated) |
+| Types and regression tests | `npm.cmd test` | All 62 tests passed (6 new idea UI & brainstorm tests) |
+| Web production build | `npm.cmd run build` | Passed; `/projects/[id]/idea`, `/api/voices`, `/api/jobs/[id]`, `/api/projects/[id]/brainstorm` compiled |
+
+### Remaining limitations
+
+- Storyboard generation backend and scene contract validation deferred to F09.
+- Storyboard review UI and inline editing deferred to F10.
+- Video generation and rendering pipeline deferred to F13–F14.
+
 
 
 
@@ -295,3 +335,4 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 | 2026-11-21 | F05 | Implemented authenticated project CRUD APIs, ownership isolation, idempotent create/delete, cursor pagination, CAS updates, cleanup jobs, and 7 endpoint tests | Production build passed, both typechecks passed, all 39 tests passed, 52 indexes verified |
 | 2026-11-21 | F06 | Implemented My Videos library UI with real API data, filter bar, load-more pagination, skeleton/error/empty states, rename and delete dialogs, and 8 integration tests | Production build passed, both typechecks passed, all 47 tests passed |
 | 2026-11-21 | F07 | Implemented authenticated idea draft GET/PATCH APIs, CAS conflict protection, autosave preservation, voice availability validation, plan staleness tracking, and 9 endpoint tests | Production build passed, both typechecks passed, all 56 tests passed |
+| 2026-11-21 | F08 | Implemented Idea & Concept editor UI, 4-step project layout, 1s debounced autosave, auditioned voices API, Gemini topic brainstorming, and 6 integration tests | Production build passed, both typechecks passed, all 62 tests passed |

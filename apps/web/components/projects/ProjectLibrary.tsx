@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import type { ProjectView, ProjectFilter, PageInfo } from './types';
 import { fetchProjects, createProject, renameProject, deleteProject } from './api';
 
@@ -91,7 +92,8 @@ function ProjectCard({
       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = '')}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-        <h3
+        <Link
+          href={`/projects/${project.id}/idea`}
           style={{
             fontSize: '15px',
             fontWeight: 600,
@@ -99,10 +101,12 @@ function ProjectCard({
             lineHeight: 1.3,
             wordBreak: 'break-word',
             flex: 1,
+            textDecoration: 'none',
+            color: 'var(--text)',
           }}
         >
           {project.title}
-        </h3>
+        </Link>
         <span
           style={{
             fontSize: '11px',
@@ -124,9 +128,16 @@ function ProjectCard({
       </span>
 
       <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+        <Link
+          href={`/projects/${project.id}/idea`}
+          className="button button--secondary"
+          style={{ fontSize: '12px', minHeight: '32px', padding: '4px 12px', flex: 1, textDecoration: 'none' }}
+        >
+          Open
+        </Link>
         <button
           className="button button--secondary"
-          style={{ fontSize: '12px', minHeight: '32px', padding: '4px 12px', flex: 1 }}
+          style={{ fontSize: '12px', minHeight: '32px', padding: '4px 12px' }}
           onClick={() => onRename(project)}
         >
           Rename
