@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { RenderButton } from '@/components/RenderButton';
+import { RenderButton } from '@/components/RenderButton';
 import type { ProjectView, ProjectFilter, PageInfo } from './types';
 import { fetchProjects, createProject, renameProject, deleteProject } from './api';
 
@@ -135,6 +137,8 @@ function ProjectCard({
         >
           Open
         </Link>
+        {/* Render Video button */}
+        <RenderButton projectId={project.id} />
         <button
           className="button button--secondary"
           style={{ fontSize: '12px', minHeight: '32px', padding: '4px 12px' }}

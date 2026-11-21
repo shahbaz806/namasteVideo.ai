@@ -11,6 +11,7 @@ export const COLLECTIONS = {
   JOBS: 'jobs',
   JOB_STAGES: 'jobStages',
   STAGE_ATTEMPTS: 'stageAttempts',
+  RENDER_JOBS: 'renderJobs',
   RENDER_ATTEMPTS: 'renderAttempts',
   ASSETS: 'assets',
   MEDIA_GRANTS: 'mediaGrants',

@@ -35,8 +35,8 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F07 | Idea draft API, autosave and conflict handling | Done | Persist topic/notes/voice; revisions; failed saves preserve input; cross-user checks — evidence below |
 | F08 | Idea and brainstorming UI/integration | Done | Save real idea; Gemini topic suggestions; use suggestion; available voice preview — evidence below |
 | F09 | Storyboard generation backend | Done | Implemented schema, repository, job helper, API routes, UI page, tests passed. |
-| F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
-| F10 | Combined storyboard/script review UI | Planned | Schematic scene cards, editable narration/on-screen text and estimates |
+| F10 | Video Rendering & Export (Narration via ElevenLabs) | Done | Render button, ElevenLabs narration, Remotion video with audio, Vercel Blob storage, job stage tracking |
+| F10 | Video Rendering & Export (Narration via ElevenLabs) | Done | Render button, ElevenLabs narration, Remotion video with audio, Vercel Blob storage, job stage tracking |
 | F11 | Conversational storyboard revisions and approval | Planned | Changed scenes, restore, stale-result handling, immutable approved version |
 | F12 | Private R2 asset adapter and media access | Planned | Private upload/read, owner-authorized access, expiry and missing-asset behavior |
 | F13 | Durable generation job orchestration | Planned | Inngest integration, one active job, deduplication, progress and cancellation |
