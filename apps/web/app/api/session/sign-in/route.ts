@@ -78,17 +78,21 @@ export async function POST(req: NextRequest) {
     }
 
     const authData = await authRes.json();
-    const user = authData.user;
+    console.log('BetterAuth signIn result:', authData);
+    const user = authData.user || authData;
     const session = authData.session;
+    const expiresAt = session?.expiresAt
+      ? new Date(session.expiresAt).toISOString()
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const sessionView = {
       user: {
-        id: user.id,
+        id: user.id || user._id,
         email: user.email,
         name: user.name || email.split('@')[0],
       },
-      expiresAt: new Date(session.expiresAt).toISOString(),
-      workspaceId: user.id,
+      expiresAt,
+      workspaceId: user.id || user._id,
       capabilities: {
         generation: true,
         instagramPublishing: true,
@@ -111,11 +115,12 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
+    console.error('Sign-in error:', err);
     return NextResponse.json(
       {
         error: {
           code: 'INTERNAL_ERROR',
-          message: 'An unexpected authentication error occurred',
+          message: err?.message || 'An unexpected authentication error occurred',
         },
         meta: { requestId },
       },

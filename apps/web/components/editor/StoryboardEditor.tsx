@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { RenderButton } from '../RenderButton';
 import type { StoryboardFrame, StoryboardDocument } from '../../lib/db/schemas/storyboard';
 
 function FrameCard({
@@ -329,8 +330,11 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
               {approving ? 'Approving…' : 'Approve Storyboard'}
             </button>
           ) : (
-            <div style={{ fontSize: '13px', color: '#6ee7b7', alignSelf: 'center', fontWeight: 600 }}>
-              ✓ Immutable Approval Locked
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ fontSize: '13px', color: '#6ee7b7', alignSelf: 'center', fontWeight: 600 }}>
+                ✓ Immutable Approval Locked
+              </div>
+              <RenderButton projectId={projectId} />
             </div>
           )}
         </div>
