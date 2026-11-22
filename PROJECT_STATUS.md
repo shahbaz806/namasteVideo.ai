@@ -6,7 +6,7 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F08 — Idea and brainstorming UI/integration: Done.** Topic, audience, and source notes editor (`/projects/[id]/idea`), four-step project layout (`/projects/[id]/layout.tsx`), 1-second debounced autosave with CAS conflict preservation, auditioned voice selector (`/api/voices`), Gemini/pedagogical brainstorming modal (`/api/projects/[id]/brainstorm`), suggestion application flow, and job inspection (`/api/jobs/[id]`) verified. Next feature: F09, Storyboard generation backend.
+**F11 — Conversational storyboard revisions and approval: Done.** Conversational AI revisions (`/api/projects/[id]/revisions`), version history lineage tracking, restore from version snapshots (`/api/projects/[id]/revisions/restore`), immutable approval record in `approvals` collection with locked state (`/api/projects/[id]/storyboard/approve`), Cinema-styled review editor, and 6 integration tests verified. Next feature: F12, Private R2 asset adapter and media access.
 
 No hosted rendering, Instagram integration, or video synthesis UI exists yet. The local video pipeline predates the application and remains separately usable.
 
@@ -36,8 +36,7 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F08 | Idea and brainstorming UI/integration | Done | Save real idea; Gemini topic suggestions; use suggestion; available voice preview — evidence below |
 | F09 | Storyboard generation backend | Done | Implemented schema, repository, job helper, API routes, UI page, tests passed. |
 | F10 | Video Rendering & Export (Narration via ElevenLabs) | Done | Render button, ElevenLabs narration, Remotion video with audio, Vercel Blob storage, job stage tracking |
-| F10 | Video Rendering & Export (Narration via ElevenLabs) | Done | Render button, ElevenLabs narration, Remotion video with audio, Vercel Blob storage, job stage tracking |
-| F11 | Conversational storyboard revisions and approval | Planned | Changed scenes, restore, stale-result handling, immutable approved version |
+| F11 | Conversational storyboard revisions and approval | Done | Changed scenes, restore, stale-result handling, immutable approved version |
 | F12 | Private R2 asset adapter and media access | Planned | Private upload/read, owner-authorized access, expiry and missing-asset behavior |
 | F13 | Durable generation job orchestration | Planned | Inngest integration, one active job, deduplication, progress and cancellation |
 | F14 | Hosted rendering integration | Planned | Approved storyboard to validated MP4; resource/runtime benchmark; previous version retained |
@@ -320,6 +319,38 @@ Verified November 21, 2026:
 
 
 
+## F11 — implementation record
+
+Scope: Conversational storyboard revisions, parent version lineage tracking, restore from version snapshots, immutable story approval in `approvals` collection, and editing lock on approved storyboards.
+
+- `apps/web/lib/db/schemas/storyboard.ts`: Updated `StoryboardDocument` and `StoryboardFrame` with `version`, `parentId`, `state: 'review_ready' | 'approved'`, `changeSummary`, `changedSceneIds`, `contentHash`, `storyHash`, and `approvalId`.
+- `apps/web/lib/db/schema.ts`: Added `ApprovalDocument` matching DB_DESIGN.md specifications.
+- `apps/web/lib/db/repositories/storyboard.ts`: Implemented `createStoryboard`, `createStoryboardRevision` (lineage/version increment), `restoreStoryboardVersion` (snapshot restore), `approveStoryboard` (immutable approval in `approvals` collection + lock), and modification guards.
+- `apps/web/app/api/projects/[id]/revisions/route.ts`: GET (list revisions) and POST (submit conversational revision instruction).
+- `apps/web/app/api/projects/[id]/revisions/restore/route.ts`: POST (restore earlier snapshot as working version).
+- `apps/web/app/api/projects/[id]/storyboard/approve/route.ts`: POST (atomic approval record creation and status update).
+- `apps/web/app/api/projects/[id]/storyboard/route.ts` & `frame/route.ts`: Migrated to standard App Router handlers with session guards.
+- `apps/web/components/editor/StoryboardEditor.tsx`: Cinema-styled UI with conversational revision input, version history selector, scene timeline cards, and storyboard approval action.
+- `tests/storyboard-revisions.test.ts`: Automated test suite covering initial storyboard creation, conversational revisions, version listing, restore functionality, immutable approval creation, and mutation rejection on approved storyboards.
+
+### Verification
+
+Verified November 22, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| Root typecheck | `npm.cmd run typecheck` | Passed (exit 0) |
+| Web typecheck | `npm.cmd run typecheck:web` | Passed (exit 0, route types generated) |
+| F11 test suite | `node --env-file-if-exists=apps/web/.env.local --import tsx --test tests/storyboard-revisions.test.ts` | 6/6 passed (exit 0) |
+| Web production build | `npm.cmd run build` | Passed (exit 0) |
+
+### Remaining limitations
+
+- Private R2 asset adapter and media access deferred to F12.
+- Inngest durable job orchestration deferred to F13.
+- Hosted rendering integration deferred to F14.
+
 ## Earlier evidence
 
 The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three generated videos, Gemini/ElevenLabs integrations, timing checks, and renderer recovery tests. Those historical results are not evidence that a hosted pipeline or dashboard works. Existing design artifacts remain in design/SCREEN_REVIEW_INDEX.md; the founder approved proceeding with implementation on October 1, 2026, with background colors normalized to the Cinema tokens.
@@ -328,6 +359,7 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 
 | Date | Feature | Change | Verification |
 | --- | --- | --- | --- |
+| 2026-11-22 | F11 | Fixed BSONVersionError in renderJob repository by migrating from Mongoose Types to native MongoDB ObjectId; added live dev-mode render progression and in-browser Cinema video player modal in RenderButton | Typecheck passed, render endpoint verified via HTTP 202 and 200 polled completed status, video player verified |
 | 2026-10-01 | Repository setup | Prepared initial public repository snapshot of the prototype, scaffold, specifications and design evidence; added standing milestone commit/push workflow | Remote confirmed empty; publishable text scanned for common credential patterns with no matches; environment and generated-media exclusions verified; F01 checks above remain applicable (no runtime code changed). Push result is verified against the remote and reported at handoff. |
 | 2026-10-01 | F01 | Completed isolated Next.js scaffold, Cinema primitives, runtime configuration and status workflow | Node 24 production build, both typechecks, 23 tests, HTTP boundary checks and desktop/mobile review passed; evidence above |
 | 2026-11-16 | F02 | Implemented MongoDB connection pooling, schema contracts, idempotent index creation, and tests | Live cluster connection verified (`ok: 1`), 46 indexes across 27 collections, both typechecks and all 25 tests passed |
