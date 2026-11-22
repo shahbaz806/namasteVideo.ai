@@ -159,3 +159,13 @@ export interface VideoDocument extends ProjectOwnedDocument {
   storyboardId: string;
   state: string;
 }
+
+export interface ApprovalDocument extends ProjectOwnedDocument {
+  kind: 'story' | 'video';
+  subjectId: string;
+  subjectHash: string;
+  approvedBy: string;
+  approvedAt: Date;
+  inheritedFromApprovalId?: string;
+  reason: 'explicit' | 'visual_inheritance' | 'voice_change_confirmation';
+}

@@ -1,21 +1,33 @@
-import { Schema, model, Document } from 'mongoose';
 import { ObjectId } from 'mongodb';
 
 /** Storyboard frame definition */
 export interface StoryboardFrame {
-  _id: ObjectId;
+  _id: string | ObjectId;
   /** Image URL (generated or uploaded) */
   imageUrl: string;
   /** Optional caption for the frame */
   caption?: string;
+  /** Narration text for the scene/frame */
+  narrationText?: string;
   /** Order index – lower appears first */
   order: number;
 }
 
-/** Storyboard document – one per project */
-export interface StoryboardDocument extends Document {
-  projectId: ObjectId;
+/** Storyboard document */
+export interface StoryboardDocument {
+  _id?: string | ObjectId;
+  projectId: string;
   ownerId: string;
+  version: number;
+  parentId?: string | null;
+  state: 'review_ready' | 'approved';
+  changeSummary?: string | null;
+  changedSceneIds?: string[];
+  contentHash?: string;
+  storyHash?: string;
+  approvalId?: string | null;
+  approvedAt?: Date | null;
+  approvedBy?: string | null;
   frames: StoryboardFrame[];
   createdAt: Date;
   updatedAt: Date;
@@ -30,37 +42,3 @@ export function validateStoryboardFrame(frame: Omit<StoryboardFrame, '_id'>): vo
     throw new Error('Invalid order – must be non‑negative');
   }
 }
-
-const StoryboardMongooseSchema = new Schema<StoryboardDocument>({
-  projectId: { type: ObjectId, required: true, index: true },
-  ownerId:   { type: String,   required: true, index: true },
-  frames: [
-    {
-      _id:      { type: ObjectId, required: true, auto: true },
-      imageUrl: { type: String, required: true,
-                  match: [/^https?:\/\/[^\s]+$/, 'Invalid URL'] },
-      caption:  { type: String },
-      order:    { type: Number, required: true, min: 0 },
-    },
-  ],
-  createdAt: { type: Date, default: () => new Date() },
-  updatedAt: { type: Date, default: () => new Date() },
-});
-
-export const Storyboard = model<StoryboardDocument>('Storyboard', StoryboardMongooseSchema);
-
-// Keep the plain‑object version for the repository (used with the native Mongo driver)
-export const StoryboardSchema = {
-  projectId: { type: ObjectId, required: true, index: true },
-  ownerId:   { type: String,   required: true, index: true },
-  frames: [
-    {
-      _id:      { type: ObjectId, required: true, auto: true },
-      imageUrl: { type: String, required: true },
-      caption:  { type: String },
-      order:    { type: Number, required: true },
-    },
-  ],
-  createdAt: { type: Date, default: () => new Date() },
-  updatedAt: { type: Date, default: () => new Date() },
-};

@@ -1,6 +1,6 @@
-import { getRenderJob, updateRenderJob } from '@/lib/db/repositories/renderJob';
-import { renderVideo } from '@/remotion/render';
-import { generateNarration } from '@/lib/elevenlabs';
+import { getRenderJob, updateRenderJob } from '../apps/web/lib/db/repositories/renderJob';
+import { renderVideo } from '../apps/web/remotion/render';
+import { generateNarration } from '../apps/web/lib/elevenlabs';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { Types } from 'mongoose';

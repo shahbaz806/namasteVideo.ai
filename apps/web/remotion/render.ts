@@ -1,5 +1,6 @@
 import { renderMedia } from '@remotion/renderer';
 import path from 'path';
+import { promises as fs } from 'fs';
 import { upload } from '@/lib/blob';
 
 /**
@@ -13,18 +14,17 @@ export async function renderVideo(
 ): Promise<string> {
   const outDir = path.resolve('tmp', jobId);
   // Ensure output directory exists
-  await import('fs').promises.mkdir(outDir, { recursive: true });
+  await fs.mkdir(outDir, { recursive: true });
 
   await renderMedia({
-    composition: 'Render',
+    composition: { id: 'Render', durationInFrames: 300, fps: 30, width: 1920, height: 1080 } as any,
     serveUrl: process.env.NEXT_PUBLIC_VERCEL_URL
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:3000',
     outputDir: outDir,
     codec: 'h264', // mp4 output
-    envVariables: { PROJECT_ID: projectId },
-    // Using default frame count from the Composition (durationInFrames)
-  });
+    envVariables: { PROJECT_ID: projectId, AUDIO_PATH: audioPath },
+  } as any);
 
   const mp4Path = path.join(outDir, 'video.mp4');
   const url = await upload(mp4Path, `render/${jobId}/video.mp4`);

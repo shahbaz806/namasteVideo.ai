@@ -1,30 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyOwnerAndProject } from '@/app/api/_auth';
+import { requireSession } from '@/lib/auth/session-guard';
+import { createSuccessResponse, createErrorResponse } from '@/lib/api';
+import { getProject } from '@/lib/db/repositories/projects';
 import { addStoryboardFrame, removeStoryboardFrame, reorderStoryboardFrames } from '@/lib/db/repositories/storyboard';
-import { Types } from 'mongoose';
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
 
 /**
  * POST /api/projects/[id]/storyboard/frame
  *   Adds a new frame to the storyboard.
- *   Body: { imageUrl: string, caption?: string, order?: number }
+ *   Body: { imageUrl: string, caption?: string, narrationText?: string, order?: number }
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const { project } = await verifyOwnerAndProject(request, params.id);
-  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+export async function POST(req: NextRequest, context: RouteContext) {
+  const auth = await requireSession(req);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const body = await request.json();
-  const { imageUrl, caption, order } = body;
+  const { user, requestId } = auth;
+  const { id: projectId } = await context.params;
+
+  const project = await getProject(user.id, projectId);
+  if (!project) return createErrorResponse('NOT_FOUND', 'Project not found', requestId, 404);
+
+  const body = await req.json();
+  const { imageUrl, caption, narrationText, order } = body;
   if (!imageUrl) {
-    return NextResponse.json({ error: 'imageUrl required' }, { status: 400 });
+    return createErrorResponse('VALIDATION_ERROR', 'imageUrl is required', requestId, 400);
   }
 
-  const frame = await addStoryboardFrame(project._id, {
-    imageUrl,
-    caption: caption ?? '',
-    order: order ?? undefined,
-  });
-
-  return NextResponse.json(frame);
+  try {
+    const updated = await addStoryboardFrame(projectId, user.id, {
+      imageUrl,
+      caption: caption ?? '',
+      narrationText: narrationText ?? '',
+      order: order ?? 0,
+    });
+    return createSuccessResponse(updated, requestId);
+  } catch (err: any) {
+    return createErrorResponse('STORYBOARD_LOCKED', err.message, requestId, 409);
+  }
 }
 
 /**
@@ -32,33 +47,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
  *   Removes a frame from the storyboard.
  *   Body: { frameId: string }
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const { project } = await verifyOwnerAndProject(request, params.id);
-  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const auth = await requireSession(req);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const { frameId } = await request.json();
+  const { user, requestId } = auth;
+  const { id: projectId } = await context.params;
+
+  const project = await getProject(user.id, projectId);
+  if (!project) return createErrorResponse('NOT_FOUND', 'Project not found', requestId, 404);
+
+  const { frameId } = await req.json();
   if (!frameId) {
-    return NextResponse.json({ error: 'frameId required' }, { status: 400 });
+    return createErrorResponse('VALIDATION_ERROR', 'frameId is required', requestId, 400);
   }
 
-  await removeStoryboardFrame(project._id, frameId);
-  return NextResponse.json({ success: true });
-}
-
-/**
- * POST /api/projects/[id]/storyboard/frame/reorder
- *   Reorders frames based on an ordered array of frame IDs.
- *   Body: { orderedIds: string[] }
- */
-export async function POST_reorder(request: NextRequest, { params }: { params: { id: string } }) {
-  const { project } = await verifyOwnerAndProject(request, params.id);
-  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-
-  const { orderedIds } = await request.json();
-  if (!Array.isArray(orderedIds)) {
-    return NextResponse.json({ error: 'orderedIds must be an array' }, { status: 400 });
+  try {
+    const updated = await removeStoryboardFrame(projectId, user.id, frameId);
+    return createSuccessResponse(updated, requestId);
+  } catch (err: any) {
+    return createErrorResponse('STORYBOARD_LOCKED', err.message, requestId, 409);
   }
-
-  await reorderStoryboardFrames(project._id, orderedIds.map(id => Types.ObjectId(id)));
-  return NextResponse.json({ success: true });
 }

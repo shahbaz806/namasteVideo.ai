@@ -7,7 +7,7 @@ import { Brand } from '@/components/ui';
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || '/dashboard';
+  const redirectTarget = searchParams?.get('redirect') || '/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { RenderButton } from '@/components/RenderButton';
-import { RenderButton } from '@/components/RenderButton';
+import { RenderButton } from '../RenderButton';
 import type { ProjectView, ProjectFilter, PageInfo } from './types';
 import { fetchProjects, createProject, renameProject, deleteProject } from './api';
 

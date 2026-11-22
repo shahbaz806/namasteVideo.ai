@@ -9,7 +9,7 @@ let mongod: MongoMemoryServer | null = null;
 let client: MongoClient | null = null;
 
 export async function connectTestDb() {
-  mongod = await MongoMemoryServer.create({ binary: { skipMD5: true } });
+  mongod = await MongoMemoryServer.create({ binary: { skipMD5: true } as any });
   const uri = mongod.getUri();
   client = new MongoClient(uri);
   await client.connect();
