@@ -359,6 +359,7 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 
 | Date | Feature | Change | Verification |
 | --- | --- | --- | --- |
+| 2026-11-22 | F11 | Fixed BSONVersionError in renderJob repository by migrating from Mongoose Types to native MongoDB ObjectId; added live dev-mode render progression and in-browser Cinema video player modal in RenderButton | Typecheck passed, render endpoint verified via HTTP 202 and 200 polled completed status, video player verified |
 | 2026-10-01 | Repository setup | Prepared initial public repository snapshot of the prototype, scaffold, specifications and design evidence; added standing milestone commit/push workflow | Remote confirmed empty; publishable text scanned for common credential patterns with no matches; environment and generated-media exclusions verified; F01 checks above remain applicable (no runtime code changed). Push result is verified against the remote and reported at handoff. |
 | 2026-10-01 | F01 | Completed isolated Next.js scaffold, Cinema primitives, runtime configuration and status workflow | Node 24 production build, both typechecks, 23 tests, HTTP boundary checks and desktop/mobile review passed; evidence above |
 | 2026-11-16 | F02 | Implemented MongoDB connection pooling, schema contracts, idempotent index creation, and tests | Live cluster connection verified (`ok: 1`), 46 indexes across 27 collections, both typechecks and all 25 tests passed |
