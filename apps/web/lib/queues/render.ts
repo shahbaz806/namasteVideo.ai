@@ -18,7 +18,7 @@ export async function enqueueRenderJob(jobId: string) {
             await updateRenderJob(jobId, {
               status: 'completed',
               stage: 'completed',
-              outputUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+              outputUrl: '/sample-video.mp4',
             } as any);
             console.log(`[Queue:render] Local job ${jobId} completed`);
           }, 2500);

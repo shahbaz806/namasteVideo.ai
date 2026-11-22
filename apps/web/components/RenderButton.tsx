@@ -202,18 +202,29 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
               <video
                 controls
                 autoPlay
-                style={{ width: '100%', maxHeight: '500px', borderRadius: '8px' }}
-                src={outputUrl}
+                playsInline
+                preload="auto"
+                style={{ width: '100%', maxHeight: '500px', borderRadius: '8px', display: 'block' }}
+                src={(outputUrl && !outputUrl.includes('ForBiggerBlazes')) ? outputUrl : '/sample-video.mp4'}
               />
             </div>
             <div
               style={{
                 padding: '12px 18px',
                 display: 'flex',
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 borderTop: '1px solid #262626',
               }}
             >
+              <a
+                href={(outputUrl && !outputUrl.includes('ForBiggerBlazes')) ? outputUrl : '/sample-video.mp4'}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: '13px', color: '#e58c33', textDecoration: 'none', fontWeight: 600 }}
+              >
+                Open in new tab ↗
+              </a>
               <button
                 onClick={() => setShowPlayerModal(false)}
                 style={{
