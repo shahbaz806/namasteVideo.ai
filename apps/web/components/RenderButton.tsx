@@ -13,11 +13,19 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
 
   const startRender = async () => {
     try {
+      setStatus('queued');
       const res = await fetch(`/api/projects/${projectId}/render`, { method: 'POST' });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Failed to trigger render HTTP error:', res.status, text);
+        setStatus('failed');
+        return;
+      }
       const data = await res.json();
       if (data.jobId) {
         setJobId(data.jobId);
-        setStatus('queued');
+      } else {
+        setStatus('failed');
       }
     } catch (err) {
       console.error('Failed to trigger render', err);
@@ -31,6 +39,7 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/render/${jobId}`);
+        if (!res.ok) return;
         const data = await res.json();
         setStatus(data.status);
         if (data.stage) setStage(data.stage);
@@ -66,7 +75,29 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
             Render Video
           </button>
         )}
-        {status !== 'idle' && status !== 'completed' && (
+        {status === 'failed' && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '13px', color: '#ef4444', fontWeight: 600 }}>
+              Render failed
+            </span>
+            <button
+              onClick={startRender}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '4px',
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: 'none',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {status !== 'idle' && status !== 'completed' && status !== 'failed' && (
           <span style={{ fontSize: '13px', color: '#e58c33', fontWeight: 600 }}>
             ⏳ Rendering ({stage || status})…
           </span>
