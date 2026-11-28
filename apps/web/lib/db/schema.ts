@@ -169,3 +169,41 @@ export interface ApprovalDocument extends ProjectOwnedDocument {
   inheritedFromApprovalId?: string;
   reason: 'explicit' | 'visual_inheritance' | 'voice_change_confirmation';
 }
+
+export type AssetKind = 'audio' | 'alignment' | 'timeline' | 'captions' | 'thumbnail' | 'preview' | 'video' | 'qa';
+export type AssetState = 'staging' | 'ready' | 'deleting' | 'deleted';
+
+export interface AssetMetadata {
+  durationSeconds?: number;
+  width?: number;
+  height?: number;
+  fps?: number;
+  codec?: string;
+}
+
+export interface AssetDocument extends ProjectOwnedDocument {
+  kind: AssetKind;
+  originVideoId?: string;
+  originJobId: string;
+  objectKey: string;
+  state: AssetState;
+  sha256?: string;
+  bytes?: number;
+  contentType: string;
+  producerFingerprint: string;
+  metadata?: AssetMetadata;
+  readyAt?: Date;
+}
+
+export type MediaGrantPurpose = 'preview' | 'download' | 'ingest' | 'render_input' | 'render_output' | 'voice_sample';
+
+export interface MediaGrantDocument extends OwnedDocument {
+  projectId?: string;
+  assetId: string;
+  tokenHash: string;
+  purpose: MediaGrantPurpose;
+  intentId?: string;
+  attemptId?: string;
+  expiresAt: Date;
+  revokedAt?: Date | null;
+}

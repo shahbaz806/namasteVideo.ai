@@ -6,7 +6,7 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F11 — Conversational storyboard revisions and approval: Done.** Conversational AI revisions (`/api/projects/[id]/revisions`), version history lineage tracking, restore from version snapshots (`/api/projects/[id]/revisions/restore`), immutable approval record in `approvals` collection with locked state (`/api/projects/[id]/storyboard/approve`), Cinema-styled review editor, and 6 integration tests verified. QA verified: F09 (62 automated tests pass), F10 (3/3 render API tests pass), F11 (6/6 revision and approval tests pass), full suite 72 tests 0 failures. Next feature: F12, Private R2 asset adapter and media access.
+**F12 — Private R2 asset adapter and media access: Done.** Private R2 object key generation and validation with path traversal rejection, memory/S3 storage adapter abstraction (`apps/web/lib/storage/r2.ts`), asset repository with staging-to-ready lifecycle (`apps/web/lib/db/repositories/assets.ts`), media access grant generation with 256-bit bearer tokens and SHA-256 hash storage (`apps/web/lib/storage/mediaGrants.ts`), V06 asset access authorization API (`/api/assets/:id/access`), and media streaming gateway route (`/api/media/:grantToken`) supporting byte-range requests (200/206/416), secure headers, tombstone revocation, and 7 automated tests verified. QA verified: full suite 79 tests 0 failures. Next feature: F13, Durable generation job orchestration.
 
 No hosted rendering, Instagram integration, or video synthesis UI exists yet. The local video pipeline predates the application and remains separately usable.
 
@@ -37,7 +37,7 @@ Repository contributors follow this workflow through AGENTS.md. No external auto
 | F09 | Storyboard generation backend | Done | Implemented schema, repository, job helper, API routes, UI page, tests passed. |
 | F10 | Video Rendering & Export (Narration via ElevenLabs) | Done | Render button, ElevenLabs narration, Remotion video with audio, Vercel Blob storage, job stage tracking |
 | F11 | Conversational storyboard revisions and approval | Done | Changed scenes, restore, stale-result handling, immutable approved version |
-| F12 | Private R2 asset adapter and media access | Planned | Private upload/read, owner-authorized access, expiry and missing-asset behavior |
+| F12 | Private R2 asset adapter and media access | Done | Private upload/read, owner-authorized access, expiry and missing-asset behavior — evidence below |
 | F13 | Durable generation job orchestration | Planned | Inngest integration, one active job, deduplication, progress and cancellation |
 | F14 | Hosted rendering integration | Planned | Approved storyboard to validated MP4; resource/runtime benchmark; previous version retained |
 | F15 | Video review, approval and download UI | Planned | Actual media playback, version selection, exact-version approval and export |
@@ -374,9 +374,38 @@ Verified November 22, 2026:
 
 ### Remaining limitations
 
-- Private R2 asset adapter and media access deferred to F12.
 - Inngest durable job orchestration deferred to F13.
 - Hosted rendering integration deferred to F14.
+
+## F12 — implementation record
+
+Scope: Private Cloudflare R2 object key generation and validation, storage adapter abstraction (`apps/web/lib/storage/r2.ts`), asset repository with staging-to-ready lifecycle (`apps/web/lib/db/repositories/assets.ts`), media access grant generation with 256-bit bearer tokens and SHA-256 hash storage (`apps/web/lib/storage/mediaGrants.ts`), V06 asset access authorization API (`/api/assets/:id/access`), and media streaming gateway route (`/api/media/:grantToken`) supporting byte-range requests (200/206/416), secure headers, tombstone revocation, and 7 automated tests.
+
+- `apps/web/lib/storage/r2.ts`: Object key generator and validator enforcing strict attempt-scoped hierarchical paths (`owners/{ownerId}/projects/{projectId}/videos/{videoId}/attempts/{attemptId}/{assetId}.{ext}`) with path traversal rejection (`..`, `//`, `\`); `StorageAdapter` interface with `putObject`, `getObject`, `deleteObject`, `headObject`, and in-memory testable backend.
+- `apps/web/lib/db/repositories/assets.ts`: Asset creation in `staging`, verified SHA-256 and byte length transitions to `ready`, query by ID and objectKey, project asset listing, and soft deletion.
+- `apps/web/lib/storage/mediaGrants.ts`: Revocable bearer capability generator creating random 256-bit tokens, storing only SHA-256 `tokenHash` in `mediaGrants` collection with 10-minute expiry; grant verification with project tombstone checking and asset readiness validation; single grant revocation and project-wide tombstone grant revocation.
+- `apps/web/app/api/assets/[id]/access/route.ts`: V06 asset access endpoint checking session ownership, undeleted project state, and asset readiness; returns short-lived capability URL (`/api/media/:grantToken`), expiration timestamp, content type, and byte length.
+- `apps/web/app/api/media/[grantToken]/route.ts`: Streaming media gateway with GET and HEAD handlers, single byte-range request support (206 Partial Content, Content-Range, Content-Length), unsatisfiable range rejection (416), generic 404 for expired/revoked/unknown tokens and tombstoned projects, and security headers (`Accept-Ranges: bytes`, `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, Content-Disposition inline or attachment).
+- `tests/r2-asset-adapter.test.ts`: 7 automated tests covering object key validation & path traversal rejection, storage adapter put/get/head/delete, asset lifecycle staging->ready->deleted, media grant token hashing and expiry/revocation, V06 access API session authorization and cross-user isolation, gateway GET/HEAD full streaming and byte ranges, and immediate grant revocation upon project tombstone.
+
+### Verification
+
+Verified November 28, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| Root typecheck | `npm.cmd run typecheck` | Passed (exit 0) |
+| Web typecheck | `npm.cmd run typecheck:web` | Passed (exit 0, route types generated) |
+| F12 test suite | `node --env-file-if-exists=apps/web/.env.local --import tsx --test tests/r2-asset-adapter.test.ts` | 7/7 passed (exit 0) |
+| Full regression suite | `npm.cmd test` | **79 tests, 6 suites, 0 failures** (exit 0) |
+| Web production build | `npm.cmd run build` | Passed (exit 0, routes `/api/assets/[id]/access` and `/api/media/[grantToken]` generated) |
+
+### Remaining limitations
+
+- Inngest durable job orchestration deferred to F13.
+- Hosted rendering integration deferred to F14.
+- Video review, approval, and download UI deferred to F15.
 
 ## Earlier evidence
 
@@ -386,6 +415,7 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 
 | Date | Feature | Change | Verification |
 | --- | --- | --- | --- |
+| 2026-11-28 | F12 | Implemented private R2 storage adapter, object key validator, asset repository, revocable media grant service, V06 asset access API, and byte-range streaming media gateway | Root/web typecheck passed, production build passed, full suite 79 tests 0 failures |
 | 2026-11-28 | F10, F11 | QA verification complete — F09/F10/F11 render API and revision tests all pass; full suite 72 tests 0 failures; fixed renderWorker.ts prototype typecheck collision | npm.cmd test 72/72 pass |
 | 2026-11-22 | F11 | Fixed BSONVersionError in renderJob repository by migrating from Mongoose Types to native MongoDB ObjectId; added live dev-mode render progression and in-browser Cinema video player modal in RenderButton | Typecheck passed, render endpoint verified via HTTP 202 and 200 polled completed status, video player verified |
 | 2026-10-01 | Repository setup | Prepared initial public repository snapshot of the prototype, scaffold, specifications and design evidence; added standing milestone commit/push workflow | Remote confirmed empty; publishable text scanned for common credential patterns with no matches; environment and generated-media exclusions verified; F01 checks above remain applicable (no runtime code changed). Push result is verified against the remote and reported at handoff. |
