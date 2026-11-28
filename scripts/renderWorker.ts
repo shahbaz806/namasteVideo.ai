@@ -3,7 +3,6 @@ import { renderVideo } from '../apps/web/remotion/render';
 import { generateNarration } from '../apps/web/lib/elevenlabs';
 import path from 'path';
 import { promises as fs } from 'fs';
-import { Types } from 'mongoose';
 
 /**
  * Render worker entry point.
@@ -22,7 +21,7 @@ async function main() {
   try {
     const job = await getRenderJob(jobId);
     if (!job) throw new Error('Render job not found');
-    const projectId = (job.projectId as Types.ObjectId).toHexString();
+    const projectId = typeof job.projectId === 'string' ? job.projectId : job.projectId.toString();
     // -------------------------------------------------
     // ① Create narration audio via ElevenLabs
     // -------------------------------------------------

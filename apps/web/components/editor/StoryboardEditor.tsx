@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { RenderButton } from '../RenderButton';
 import type { StoryboardFrame, StoryboardDocument } from '../../lib/db/schemas/storyboard';
 
@@ -127,8 +127,10 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
   const [approving, setApproving] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const latestLoadId = useRef(0);
 
   const loadData = useCallback(async () => {
+    const requestId = ++latestLoadId.current;
     setLoading(true);
     try {
       const [sbRes, versRes] = await Promise.all([
@@ -138,12 +140,21 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
       const sbData = await sbRes.json();
       const versData = await versRes.json();
 
-      setStoryboard(sbData.data ?? sbData);
-      setVersions(versData.data ?? versData ?? []);
+      if (requestId !== latestLoadId.current) return;
+
+      if (sbRes.ok) {
+        setStoryboard(sbData.data ?? sbData);
+      }
+      if (versRes.ok) {
+        const list = versData.data ?? versData;
+        setVersions(Array.isArray(list) ? list : []);
+      }
     } catch (err) {
       console.error('Failed to load storyboard data', err);
     } finally {
-      setLoading(false);
+      if (requestId === latestLoadId.current) {
+        setLoading(false);
+      }
     }
   }, [projectId]);
 
@@ -166,7 +177,8 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
         setStatusMessage('Storyboard approved! An immutable approval record has been created.');
         await loadData();
       } else {
-        setStatusMessage(`Approval failed: ${data.message || data.error}`);
+        const msg = data.error?.message || data.message || 'Approval failed';
+        setStatusMessage(`Approval failed: ${msg}`);
       }
     } catch (err: any) {
       setStatusMessage(`Error approving: ${err.message}`);
@@ -193,7 +205,8 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
         setStatusMessage('Revision created successfully as a new version!');
         await loadData();
       } else {
-        setStatusMessage(`Revision failed: ${data.message || data.error}`);
+        const msg = data.error?.message || data.message || 'Revision failed';
+        setStatusMessage(`Revision failed: ${msg}`);
       }
     } catch (err: any) {
       setStatusMessage(`Error creating revision: ${err.message}`);
@@ -216,7 +229,8 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
         setStatusMessage('Version restored successfully as the new active revision!');
         await loadData();
       } else {
-        setStatusMessage(`Restore failed: ${data.message || data.error}`);
+        const msg = data.error?.message || data.message || 'Restore failed';
+        setStatusMessage(`Restore failed: ${msg}`);
       }
     } catch (err: any) {
       setStatusMessage(`Error restoring: ${err.message}`);
@@ -255,6 +269,25 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
       await loadData();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleReorderFrames = async (fromIdx: number, toIdx: number) => {
+    if (!storyboard || !frames || toIdx < 0 || toIdx >= frames.length) return;
+    const newFrames = [...frames];
+    const [moved] = newFrames.splice(fromIdx, 1);
+    newFrames.splice(toIdx, 0, moved);
+    const orderedIds = newFrames.map((f) => String(f._id));
+
+    try {
+      await fetch(`/api/projects/${projectId}/storyboard/frame`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      });
+      await loadData();
+    } catch (err) {
+      console.error('Failed to reorder frames:', err);
     }
   };
 
@@ -453,8 +486,8 @@ export default function StoryboardEditor({ projectId }: { projectId: string }) {
                 idx={idx}
                 isApproved={isApproved}
                 onRemove={() => handleRemoveFrame(String(frame._id))}
-                onMoveUp={() => {}}
-                onMoveDown={() => {}}
+                onMoveUp={() => handleReorderFrames(idx, idx - 1)}
+                onMoveDown={() => handleReorderFrames(idx, idx + 1)}
               />
             ))}
           </div>

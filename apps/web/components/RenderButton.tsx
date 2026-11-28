@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface RenderButtonProps {
   projectId: string;
@@ -10,6 +10,8 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
   const [stage, setStage] = useState<string | null>(null);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
+  const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   const startRender = async () => {
     try {
@@ -33,27 +35,57 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
     }
   };
 
-  // poll job status
+  // poll job status with race condition guard
   useEffect(() => {
     if (!jobId) return;
+    let stopped = false;
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/render/${jobId}`);
         if (!res.ok) return;
         const data = await res.json();
+        if (stopped) return;
+
         setStatus(data.status);
         if (data.stage) setStage(data.stage);
         if (data.status === 'completed') {
+          stopped = true;
           setOutputUrl(data.outputUrl);
           clearInterval(interval);
         }
-        if (data.status === 'failed') clearInterval(interval);
+        if (data.status === 'failed') {
+          stopped = true;
+          clearInterval(interval);
+        }
       } catch (err) {
         console.error('Polling error', err);
       }
     }, 1200);
-    return () => clearInterval(interval);
+
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
   }, [jobId]);
+
+  // Handle escape key and focus restoration for accessible dialog
+  useEffect(() => {
+    if (!showPlayerModal) return;
+    modalCloseRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowPlayerModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      playButtonRef.current?.focus();
+    };
+  }, [showPlayerModal]);
 
   return (
     <>
@@ -105,6 +137,7 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
         {outputUrl && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
             <button
+              ref={playButtonRef}
               onClick={() => setShowPlayerModal(true)}
               style={{
                 padding: '6px 14px',
@@ -146,6 +179,9 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
 
       {showPlayerModal && outputUrl && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="video-player-preview-heading"
           style={{
             position: 'fixed',
             top: 0,
@@ -182,11 +218,13 @@ export const RenderButton: React.FC<RenderButtonProps> = ({ projectId }) => {
                 borderBottom: '1px solid #262626',
               }}
             >
-              <span style={{ fontWeight: 600, color: '#f5f5f5', fontSize: '15px' }}>
+              <h2 id="video-player-preview-heading" style={{ fontWeight: 600, color: '#f5f5f5', fontSize: '15px', margin: 0 }}>
                 🎬 Video Player Preview
-              </span>
+              </h2>
               <button
+                ref={modalCloseRef}
                 onClick={() => setShowPlayerModal(false)}
+                aria-label="Close video player"
                 style={{
                   background: 'transparent',
                   border: 'none',

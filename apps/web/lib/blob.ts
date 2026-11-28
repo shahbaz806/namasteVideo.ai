@@ -14,8 +14,16 @@ export async function upload(filePath: string, destination: string): Promise<str
     const { put } = await import('@vercel/blob' as any);
     const blob = await put(destination, fileBuffer, { access: 'public', contentType: mime });
     return blob.url;
-  } catch {
-    // Fallback URL for environments without @vercel/blob token configured
-    return `/media/render/${path.basename(destination)}`;
+  } catch (err) {
+    if (process.env.NODE_ENV === 'production' && process.env.BLOB_READ_WRITE_TOKEN) {
+      throw err;
+    }
+    // Fallback: Copy to public directory so it is genuinely served locally
+    const publicDir = path.resolve(process.cwd(), 'apps/web/public');
+    await fs.promises.mkdir(publicDir, { recursive: true });
+    const targetName = path.basename(destination);
+    const localTarget = path.join(publicDir, targetName);
+    await fs.promises.copyFile(filePath, localTarget);
+    return `/${targetName}`;
   }
 }

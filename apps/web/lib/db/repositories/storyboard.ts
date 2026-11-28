@@ -8,6 +8,20 @@ function computeHash(content: unknown): string {
   return crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
 }
 
+function normalizeStoryboard(doc: any): StoryboardDocument | null {
+  if (!doc) return null;
+  return {
+    ...doc,
+    version: doc.version ?? 1,
+    state: doc.state ?? 'review_ready',
+    frames: (doc.frames || []).map((f: any, i: number) => ({
+      ...f,
+      _id: f._id || new ObjectId(),
+      order: f.order ?? i,
+    })),
+  };
+}
+
 /** Fetch the current/latest storyboard for a project */
 export async function getStoryboard(projectId: string, ownerId?: string): Promise<StoryboardDocument | null> {
   const db = await getDb();
@@ -22,7 +36,7 @@ export async function getStoryboard(projectId: string, ownerId?: string): Promis
     .limit(1)
     .next();
 
-  return doc;
+  return normalizeStoryboard(doc);
 }
 
 /** Fetch a specific storyboard version by its ID */
@@ -38,7 +52,8 @@ export async function getStoryboardById(storyboardId: string, ownerId?: string):
   const filter: any = { $or: [{ _id: queryId }, { _id: storyboardId }] };
   if (ownerId) filter.ownerId = ownerId;
 
-  return await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).findOne(filter);
+  const doc = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).findOne(filter);
+  return normalizeStoryboard(doc);
 }
 
 /** List all storyboard versions for a project */
@@ -47,11 +62,13 @@ export async function listStoryboardVersions(projectId: string, ownerId?: string
   const filter: any = { projectId };
   if (ownerId) filter.ownerId = ownerId;
 
-  return await db
+  const docs = await db
     .collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS)
     .find(filter)
     .sort({ version: -1, createdAt: -1 })
     .toArray();
+
+  return docs.map((d) => normalizeStoryboard(d) as StoryboardDocument);
 }
 
 /** Create a new storyboard version (v1 or fresh) */
@@ -129,21 +146,31 @@ export async function createStoryboardRevision(
     // Modify existing frames according to instruction
     if (sceneId) {
       const targetFrame = currentFrames.find((f) => String(f._id) === sceneId);
-      if (targetFrame) {
-        targetFrame.caption = `${targetFrame.caption || 'Scene'} [Revised: ${instruction}]`;
-        targetFrame.narrationText = `${targetFrame.narrationText || ''} (${instruction})`;
-        changedSceneIds.push(String(targetFrame._id));
+      if (!targetFrame) {
+        throw new Error(`Scene '${sceneId}' not found in storyboard`);
       }
+      targetFrame.caption = `${targetFrame.caption || 'Scene'} [Revised: ${instruction}]`;
+      targetFrame.narrationText = `${targetFrame.narrationText || ''} (${instruction})`;
+      changedSceneIds.push(String(targetFrame._id));
     } else {
       // General modification across scenes
       currentFrames.forEach((frame) => {
-        frame.caption = `${frame.caption || 'Scene'} (revised)`;
+        frame.caption = `${frame.caption || 'Scene'} [Revised]`;
+        if (instruction.toLowerCase().includes('shorten')) {
+          frame.narrationText = frame.narrationText
+            ? frame.narrationText.slice(0, Math.max(20, Math.floor(frame.narrationText.length * 0.7)))
+            : frame.narrationText;
+        } else if (instruction.toLowerCase().includes('expand')) {
+          frame.narrationText = `${frame.narrationText || ''} Further details explaining the concept clearly.`;
+        } else {
+          frame.narrationText = `${frame.narrationText || ''} (${instruction})`;
+        }
         changedSceneIds.push(String(frame._id));
       });
     }
   }
 
-  const nextVersion = (current?.version || 1) + 1;
+  const nextVersion = current ? (current.version || 1) + 1 : 1;
   const contentHash = computeHash(currentFrames);
   const storyHash = computeHash({
     projectId,
@@ -181,7 +208,7 @@ export async function restoreStoryboardVersion(
   targetVersionId: string
 ): Promise<StoryboardDocument> {
   const target = await getStoryboardById(targetVersionId, ownerId);
-  if (!target) {
+  if (!target || String(target.projectId) !== String(projectId)) {
     throw new Error('Target storyboard version not found');
   }
 
@@ -229,7 +256,7 @@ export async function approveStoryboard(
     ? await getStoryboardById(storyboardId, ownerId)
     : await getStoryboard(projectId, ownerId);
 
-  if (!storyboard) {
+  if (!storyboard || String(storyboard.projectId) !== String(projectId)) {
     throw new Error('Storyboard not found for approval');
   }
 
@@ -248,6 +275,33 @@ export async function approveStoryboard(
   const approvalId = new ObjectId().toHexString();
   const subjectHash = storyboard.storyHash || computeHash(storyboard.frames);
 
+  let queryId: any;
+  try {
+    queryId = new ObjectId(String(storyboard._id));
+  } catch {
+    queryId = storyboard._id;
+  }
+
+  const updateResult = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
+    {
+      $or: [{ _id: queryId }, { _id: String(storyboard._id) }],
+      state: { $ne: 'approved' },
+    },
+    {
+      $set: {
+        state: 'approved',
+        approvalId,
+        approvedAt: new Date(),
+        approvedBy: ownerId,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  if (updateResult.matchedCount === 0) {
+    throw new Error('Storyboard is already approved or could not be locked');
+  }
+
   const approvalDoc: ApprovalDocument = {
     _id: approvalId,
     schemaVersion: 1,
@@ -265,26 +319,6 @@ export async function approveStoryboard(
 
   await db.collection<ApprovalDocument>(COLLECTIONS.APPROVALS).insertOne(approvalDoc as any);
 
-  let queryId: any;
-  try {
-    queryId = new ObjectId(String(storyboard._id));
-  } catch {
-    queryId = storyboard._id;
-  }
-
-  await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
-    { $or: [{ _id: queryId }, { _id: String(storyboard._id) }] },
-    {
-      $set: {
-        state: 'approved',
-        approvalId,
-        approvedAt: new Date(),
-        approvedBy: ownerId,
-        updatedAt: new Date(),
-      },
-    }
-  );
-
   const updatedStoryboard = await getStoryboardById(String(storyboard._id), ownerId);
   return {
     storyboard: updatedStoryboard || { ...storyboard, state: 'approved', approvalId },
@@ -299,12 +333,21 @@ export async function replaceStoryboard(projectId: string, ownerId: string, fram
     throw new Error('Cannot directly modify an approved storyboard; create a revision instead.');
   }
 
+  const contentHash = computeHash(frames);
+  const storyHash = computeHash({
+    projectId,
+    frames: frames.map((f) => ({ caption: f.caption, narrationText: f.narrationText, order: f.order })),
+  });
+
   const db = await getDb();
   if (current) {
-    await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
-      { _id: current._id },
-      { $set: { frames, updatedAt: new Date(), contentHash: computeHash(frames) } }
+    const res = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
+      { _id: current._id, state: { $ne: 'approved' } },
+      { $set: { frames, updatedAt: new Date(), contentHash, storyHash } }
     );
+    if (res.matchedCount === 0) {
+      throw new Error('Cannot directly modify an approved storyboard; create a revision instead.');
+    }
     return await getStoryboardById(String(current._id), ownerId);
   }
 
@@ -322,13 +365,23 @@ export async function addStoryboardFrame(projectId: string, ownerId: string, fra
   const newFrame: StoryboardFrame = { ...frame, _id: new ObjectId() };
 
   if (current) {
-    await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
-      { _id: current._id },
+    const updatedFrames = [...current.frames, newFrame];
+    const contentHash = computeHash(updatedFrames);
+    const storyHash = computeHash({
+      projectId,
+      frames: updatedFrames.map((f) => ({ caption: f.caption, narrationText: f.narrationText, order: f.order })),
+    });
+
+    const res = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
+      { _id: current._id, state: { $ne: 'approved' } },
       {
         $push: { frames: newFrame },
-        $set: { updatedAt: new Date() },
+        $set: { updatedAt: new Date(), contentHash, storyHash },
       }
     );
+    if (res.matchedCount === 0) {
+      throw new Error('Cannot directly modify an approved storyboard; create a revision instead.');
+    }
     return await getStoryboardById(String(current._id), ownerId);
   }
 
@@ -343,6 +396,13 @@ export async function removeStoryboardFrame(projectId: string, ownerId: string, 
   }
   if (!current) throw new Error('Storyboard not found');
 
+  const updatedFrames = current.frames.filter((f) => String(f._id) !== frameId);
+  const contentHash = computeHash(updatedFrames);
+  const storyHash = computeHash({
+    projectId,
+    frames: updatedFrames.map((f) => ({ caption: f.caption, narrationText: f.narrationText, order: f.order })),
+  });
+
   const db = await getDb();
   let objId: any;
   try {
@@ -351,13 +411,16 @@ export async function removeStoryboardFrame(projectId: string, ownerId: string, 
     objId = frameId;
   }
 
-  await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
-    { _id: current._id },
+  const res = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
+    { _id: current._id, state: { $ne: 'approved' } },
     {
       $pull: { frames: { $or: [{ _id: objId }, { _id: frameId }] } as any },
-      $set: { updatedAt: new Date() },
+      $set: { updatedAt: new Date(), contentHash, storyHash },
     }
   );
+  if (res.matchedCount === 0) {
+    throw new Error('Cannot directly modify an approved storyboard; create a revision instead.');
+  }
   return await getStoryboardById(String(current._id), ownerId);
 }
 
@@ -376,10 +439,19 @@ export async function reorderStoryboardFrames(projectId: string, ownerId: string
     return { ...f, order: idx };
   });
 
+  const contentHash = computeHash(reordered);
+  const storyHash = computeHash({
+    projectId,
+    frames: reordered.map((f) => ({ caption: f.caption, narrationText: f.narrationText, order: f.order })),
+  });
+
   const db = await getDb();
-  await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
-    { _id: current._id },
-    { $set: { frames: reordered, updatedAt: new Date() } }
+  const res = await db.collection<StoryboardDocument>(COLLECTIONS.STORYBOARDS).updateOne(
+    { _id: current._id, state: { $ne: 'approved' } },
+    { $set: { frames: reordered, updatedAt: new Date(), contentHash, storyHash } }
   );
+  if (res.matchedCount === 0) {
+    throw new Error('Cannot directly modify an approved storyboard; create a revision instead.');
+  }
   return await getStoryboardById(String(current._id), ownerId);
 }

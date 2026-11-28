@@ -26,14 +26,25 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   let body: any = {};
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
+  const text = await req.text();
+  if (text.trim().length > 0) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return createErrorResponse('INVALID_BODY', 'Invalid JSON payload.', requestId, 400);
+    }
+  }
+
+  if (body !== null && typeof body !== 'object') {
+    return createErrorResponse('VALIDATION_ERROR', 'Request body must be a JSON object.', requestId, 400);
+  }
+
+  if (body?.storyboardId !== undefined && (typeof body.storyboardId !== 'string' || !body.storyboardId.trim())) {
+    return createErrorResponse('VALIDATION_ERROR', 'When provided, storyboardId must be a non-empty string.', requestId, 400);
   }
 
   try {
-    const result = await approveStoryboard(projectId, user.id, body.storyboardId);
+    const result = await approveStoryboard(projectId, user.id, body?.storyboardId ? body.storyboardId.trim() : undefined);
     return createSuccessResponse(result, requestId);
   } catch (err: any) {
     return createErrorResponse('APPROVAL_FAILED', err.message || 'Failed to approve storyboard.', requestId, 400);

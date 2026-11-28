@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
     }
 
     const authData = await authRes.json();
-    console.log('BetterAuth signIn result:', authData);
     const user = authData.user || authData;
     const session = authData.session;
     const expiresAt = session?.expiresAt
@@ -120,7 +119,7 @@ export async function POST(req: NextRequest) {
       {
         error: {
           code: 'INTERNAL_ERROR',
-          message: err?.message || 'An unexpected authentication error occurred',
+          message: 'An unexpected authentication error occurred',
         },
         meta: { requestId },
       },

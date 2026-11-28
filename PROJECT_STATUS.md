@@ -6,7 +6,7 @@ This is the source of truth for development progress. Specifications describe in
 
 ## Current checkpoint
 
-**F11 — Conversational storyboard revisions and approval: Done.** Conversational AI revisions (`/api/projects/[id]/revisions`), version history lineage tracking, restore from version snapshots (`/api/projects/[id]/revisions/restore`), immutable approval record in `approvals` collection with locked state (`/api/projects/[id]/storyboard/approve`), Cinema-styled review editor, and 6 integration tests verified. Next feature: F12, Private R2 asset adapter and media access.
+**F11 — Conversational storyboard revisions and approval: Done.** Conversational AI revisions (`/api/projects/[id]/revisions`), version history lineage tracking, restore from version snapshots (`/api/projects/[id]/revisions/restore`), immutable approval record in `approvals` collection with locked state (`/api/projects/[id]/storyboard/approve`), Cinema-styled review editor, and 6 integration tests verified. QA verified: F09 (62 automated tests pass), F10 (3/3 render API tests pass), F11 (6/6 revision and approval tests pass), full suite 72 tests 0 failures. Next feature: F12, Private R2 asset adapter and media access.
 
 No hosted rendering, Instagram integration, or video synthesis UI exists yet. The local video pipeline predates the application and remains separately usable.
 
@@ -317,6 +317,33 @@ Verified November 21, 2026:
 - Video generation and rendering pipeline deferred to F13–F14.
 
 
+## F10 — implementation record
+
+Scope: Video render job creation API, job status polling, local dev-mode simulation queue, and 3-test automated suite.
+
+- `apps/web/lib/db/repositories/renderJob.ts`: `createRenderJob`, `getRenderJob`, `updateRenderJob` with native MongoDB `ObjectId` (no Mongoose dependency).
+- `apps/web/lib/db/schemas/renderJob.ts`: `RenderJobDocument` with status (`queued|running|completed|failed`), stage, outputUrl, errorMessage.
+- `apps/web/app/api/projects/[id]/render/route.ts`: POST — creates render job, enqueues via `enqueueRenderJob`, returns 202 `{jobId}`.
+- `apps/web/app/api/render/[jobId]/route.ts`: GET — session-guarded owner-scoped job status and outputUrl poll endpoint.
+- `apps/web/lib/queues/render.ts`: `enqueueRenderJob` — tries `@vercel/queue`; falls back to local setTimeout simulation (`queued → creating_narration → rendering_video → completed`) for dev/test.
+- `scripts/renderWorker.ts`: Fixed Mongoose `Types.ObjectId` import replaced with plain `toString()` to resolve prototype typecheck collision.
+- `tests/render.test.ts`: 3 automated tests covering POST create (202+DB), GET status (200), GET 404 for unknown ID.
+
+### Verification
+
+Verified November 28, 2026:
+
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Runtime | Node v24.13.0, npm 11.6.2 | Passed |
+| F10 test suite | `node --import tsx --test tests/render.test.ts` | 3/3 passed (exit 0) |
+| Full suite regression | `npm.cmd test` | **72 tests, 0 failures** (F09–F11 + all prior features) |
+
+### Remaining limitations
+
+- ElevenLabs narration and Remotion render are prototype-only; hosted rendering pipeline deferred to F14.
+- Vercel Blob upload deferred to F12 (private R2 adapter).
+
 
 
 ## F11 — implementation record
@@ -328,7 +355,7 @@ Scope: Conversational storyboard revisions, parent version lineage tracking, res
 - `apps/web/lib/db/repositories/storyboard.ts`: Implemented `createStoryboard`, `createStoryboardRevision` (lineage/version increment), `restoreStoryboardVersion` (snapshot restore), `approveStoryboard` (immutable approval in `approvals` collection + lock), and modification guards.
 - `apps/web/app/api/projects/[id]/revisions/route.ts`: GET (list revisions) and POST (submit conversational revision instruction).
 - `apps/web/app/api/projects/[id]/revisions/restore/route.ts`: POST (restore earlier snapshot as working version).
-- `apps/web/app/api/projects/[id]/storyboard/approve/route.ts`: POST (atomic approval record creation and status update).
+- `apps/web/app/api/projects/[id]/storyboard/approve/route.ts`: POST (guarded storyboard lock and immutable approval record creation).
 - `apps/web/app/api/projects/[id]/storyboard/route.ts` & `frame/route.ts`: Migrated to standard App Router handlers with session guards.
 - `apps/web/components/editor/StoryboardEditor.tsx`: Cinema-styled UI with conversational revision input, version history selector, scene timeline cards, and storyboard approval action.
 - `tests/storyboard-revisions.test.ts`: Automated test suite covering initial storyboard creation, conversational revisions, version listing, restore functionality, immutable approval creation, and mutation rejection on approved storyboards.
@@ -359,6 +386,7 @@ The local pipeline history is retained in PROTOTYPE_STATUS.md. It records three 
 
 | Date | Feature | Change | Verification |
 | --- | --- | --- | --- |
+| 2026-11-28 | F10, F11 | QA verification complete — F09/F10/F11 render API and revision tests all pass; full suite 72 tests 0 failures; fixed renderWorker.ts prototype typecheck collision | npm.cmd test 72/72 pass |
 | 2026-11-22 | F11 | Fixed BSONVersionError in renderJob repository by migrating from Mongoose Types to native MongoDB ObjectId; added live dev-mode render progression and in-browser Cinema video player modal in RenderButton | Typecheck passed, render endpoint verified via HTTP 202 and 200 polled completed status, video player verified |
 | 2026-10-01 | Repository setup | Prepared initial public repository snapshot of the prototype, scaffold, specifications and design evidence; added standing milestone commit/push workflow | Remote confirmed empty; publishable text scanned for common credential patterns with no matches; environment and generated-media exclusions verified; F01 checks above remain applicable (no runtime code changed). Push result is verified against the remote and reported at handoff. |
 | 2026-10-01 | F01 | Completed isolated Next.js scaffold, Cinema primitives, runtime configuration and status workflow | Node 24 production build, both typechecks, 23 tests, HTTP boundary checks and desktop/mobile review passed; evidence above |

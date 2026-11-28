@@ -45,11 +45,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return createErrorResponse('NOT_FOUND', 'Project not found.', requestId, 404);
   }
 
-  let body: any = {};
+  let body: any;
   try {
     body = await req.json();
   } catch {
     return createErrorResponse('INVALID_BODY', 'Invalid JSON payload.', requestId, 400);
+  }
+
+  if (!body || typeof body !== 'object') {
+    return createErrorResponse('VALIDATION_ERROR', 'Request body must be a JSON object.', requestId, 400);
   }
 
   const { instruction, sceneId } = body;
@@ -61,10 +65,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return createErrorResponse('VALIDATION_ERROR', 'Instruction exceeds maximum 4,000 characters.', requestId, 400);
   }
 
+  if (sceneId !== undefined && (typeof sceneId !== 'string' || !sceneId.trim())) {
+    return createErrorResponse('VALIDATION_ERROR', 'When provided, sceneId must be a non-empty string.', requestId, 400);
+  }
+
   try {
-    const revision = await createStoryboardRevision(projectId, user.id, instruction.trim(), sceneId);
+    const revision = await createStoryboardRevision(projectId, user.id, instruction.trim(), sceneId ? sceneId.trim() : undefined);
     return createSuccessResponse(revision, requestId, 201);
   } catch (err: any) {
-    return createErrorResponse('REVISION_FAILED', err.message || 'Failed to create revision.', requestId, 500);
+    console.error('Failed to create storyboard revision:', err);
+    return createErrorResponse('REVISION_FAILED', 'Failed to create revision.', requestId, 500);
   }
 }
